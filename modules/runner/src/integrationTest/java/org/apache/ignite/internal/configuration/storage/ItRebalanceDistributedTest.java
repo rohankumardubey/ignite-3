@@ -65,6 +65,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.function.LongFunction;
+import java.util.function.LongSupplier;
 import java.util.function.Predicate;
 import java.util.stream.IntStream;
 import org.apache.ignite.client.handler.configuration.ClientConnectorConfiguration;
@@ -73,6 +74,7 @@ import org.apache.ignite.internal.baseline.BaselineManager;
 import org.apache.ignite.internal.catalog.CatalogManager;
 import org.apache.ignite.internal.catalog.CatalogManagerImpl;
 import org.apache.ignite.internal.catalog.ClockWaiter;
+import org.apache.ignite.internal.catalog.configuration.SchemaSynchronizationConfiguration;
 import org.apache.ignite.internal.catalog.descriptors.CatalogTableDescriptor;
 import org.apache.ignite.internal.catalog.descriptors.CatalogZoneDescriptor;
 import org.apache.ignite.internal.catalog.storage.UpdateLogImpl;
@@ -148,6 +150,7 @@ import org.apache.ignite.internal.table.TableImpl;
 import org.apache.ignite.internal.table.distributed.TableManager;
 import org.apache.ignite.internal.table.distributed.TableMessageGroup;
 import org.apache.ignite.internal.table.distributed.raft.snapshot.outgoing.OutgoingSnapshotsManager;
+import org.apache.ignite.internal.table.distributed.schema.SchemaSyncServiceImpl;
 import org.apache.ignite.internal.testframework.BaseIgniteAbstractTest;
 import org.apache.ignite.internal.testframework.WorkDirectory;
 import org.apache.ignite.internal.testframework.WorkDirectoryExtension;
@@ -772,10 +775,18 @@ public class ItRebalanceDistributedTest extends BaseIgniteAbstractTest {
 
             clockWaiter = new ClockWaiter(name, hybridClock);
 
+            SchemaSynchronizationConfiguration schemaSyncConfig = clusterConfigRegistry.getConfiguration(
+                    SchemaSynchronizationConfiguration.KEY
+            );
+
+            LongSupplier delayDuration = () -> schemaSyncConfig.delayDuration().value();
+
             catalogManager = new CatalogManagerImpl(
                     new UpdateLogImpl(metaStorageManager),
-                    clockWaiter
-            );
+                    clockWaiter,
+                    delayDuration);
+
+            var schemaSyncService = new SchemaSyncServiceImpl(metaStorageManager.clusterTime(), catalogManager, delayDuration);
 
             schemaManager = new SchemaManager(registry, tablesCfg, metaStorageManager);
 
@@ -815,7 +826,8 @@ public class ItRebalanceDistributedTest extends BaseIgniteAbstractTest {
                     vaultManager,
                     cmgManager,
                     distributionZoneManager,
-                    catalogManager
+                    catalogManager,
+                    schemaSyncService
             ) {
                 @Override
                 protected TxStateTableStorage createTxStateTableStorage(

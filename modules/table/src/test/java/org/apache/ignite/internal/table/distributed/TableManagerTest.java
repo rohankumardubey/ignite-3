@@ -112,6 +112,7 @@ import org.apache.ignite.internal.storage.pagememory.PersistentPageMemoryStorage
 import org.apache.ignite.internal.storage.pagememory.configuration.schema.PersistentPageMemoryStorageEngineConfiguration;
 import org.apache.ignite.internal.table.TableImpl;
 import org.apache.ignite.internal.table.distributed.raft.snapshot.outgoing.OutgoingSnapshotsManager;
+import org.apache.ignite.internal.table.distributed.schema.SchemaSyncService;
 import org.apache.ignite.internal.table.event.TableEvent;
 import org.apache.ignite.internal.testframework.IgniteAbstractTest;
 import org.apache.ignite.internal.tx.TxManager;
@@ -836,7 +837,8 @@ public class TableManagerTest extends IgniteAbstractTest {
                 vaultManager,
                 cmgMgr,
                 distributionZoneManager,
-                mock(CatalogManager.class)
+                mock(CatalogManager.class),
+                mock(SchemaSyncService.class)
         ) {
 
             @Override

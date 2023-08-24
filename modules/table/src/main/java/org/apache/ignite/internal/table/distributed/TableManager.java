@@ -167,6 +167,7 @@ import org.apache.ignite.internal.table.distributed.raft.snapshot.outgoing.Snaps
 import org.apache.ignite.internal.table.distributed.replicator.PartitionReplicaListener;
 import org.apache.ignite.internal.table.distributed.replicator.PlacementDriver;
 import org.apache.ignite.internal.table.distributed.schema.NonHistoricSchemas;
+import org.apache.ignite.internal.table.distributed.schema.SchemaSyncService;
 import org.apache.ignite.internal.table.distributed.storage.InternalTableImpl;
 import org.apache.ignite.internal.table.distributed.storage.PartitionStorages;
 import org.apache.ignite.internal.table.event.TableEvent;
@@ -373,6 +374,8 @@ public class TableManager extends Producer<TableEvent, TableEventParameters> imp
 
     private final ConfiguredTablesCache configuredTablesCache;
 
+    private final SchemaSyncService schemaSyncService;
+
     private final CatalogManager catalogManager;
 
     /** Versioned value used only at manager startup to correctly fire table creation events. */
@@ -425,7 +428,8 @@ public class TableManager extends Producer<TableEvent, TableEventParameters> imp
             VaultManager vaultManager,
             ClusterManagementGroupManager cmgMgr,
             DistributionZoneManager distributionZoneManager,
-            CatalogManager catalogManager
+            CatalogManager catalogManager,
+            SchemaSyncService schemaSyncService
     ) {
         this.tablesCfg = tablesCfg;
         this.zonesConfig = zonesConfig;
@@ -449,6 +453,7 @@ public class TableManager extends Producer<TableEvent, TableEventParameters> imp
         this.cmgMgr = cmgMgr;
         this.distributionZoneManager = distributionZoneManager;
         this.catalogManager = catalogManager;
+        this.schemaSyncService = schemaSyncService;
 
         clusterNodeResolver = topologyService::getByConsistentId;
 

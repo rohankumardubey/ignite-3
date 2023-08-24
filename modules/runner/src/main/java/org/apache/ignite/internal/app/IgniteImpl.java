@@ -128,6 +128,7 @@ import org.apache.ignite.internal.storage.DataStorageModules;
 import org.apache.ignite.internal.table.distributed.TableManager;
 import org.apache.ignite.internal.table.distributed.TableMessageGroup;
 import org.apache.ignite.internal.table.distributed.raft.snapshot.outgoing.OutgoingSnapshotsManager;
+import org.apache.ignite.internal.table.distributed.schema.SchemaSyncServiceImpl;
 import org.apache.ignite.internal.thread.NamedThreadFactory;
 import org.apache.ignite.internal.tx.LockManager;
 import org.apache.ignite.internal.tx.TxManager;
@@ -504,6 +505,12 @@ public class IgniteImpl implements Ignite {
                 () -> schemaSyncConfig.delayDuration().value()
         );
 
+        SchemaSyncServiceImpl schemaSyncService = new SchemaSyncServiceImpl(
+                metaStorageManager().clusterTime(),
+                catalogManager,
+                () -> schemaSyncConfig.delayDuration().value()
+        );
+
         distributionZoneManager = new DistributionZoneManager(
                 name,
                 registry,
@@ -544,7 +551,8 @@ public class IgniteImpl implements Ignite {
                 vaultMgr,
                 cmgMgr,
                 distributionZoneManager,
-                catalogManager
+                catalogManager,
+                schemaSyncService
         );
 
         indexManager = new IndexManager(tablesConfig, schemaManager, distributedTblMgr, catalogManager, metaStorageMgr, registry);
