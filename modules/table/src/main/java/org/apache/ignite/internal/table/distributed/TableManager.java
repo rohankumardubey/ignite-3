@@ -1821,60 +1821,34 @@ public class TableManager extends Producer<TableEvent, TableEventParameters> imp
      * @return Future representing pending completion of the operation.
      */
     private CompletableFuture<List<Table>> tablesAsyncInternal() {
-        return supplyAsync(() -> inBusyLock(busyLock, this::directTableIds), ioExecutor)
-                .thenCompose(tableIds -> inBusyLock(busyLock, () -> {
-                    var tableFuts = new CompletableFuture[tableIds.size()];
+        return schemaSyncService.waitForMetadataCompleteness(clock.now())
+                .thenApply(ignore -> List.copyOf(latestTablesById().values()));
+    }
 
-                    var i = 0;
+    /**
+     * Return actual table id by given name or {@code null} if table doesn't exist.
+     *
+     * @param tblName Table name
+     * @return Operation future.
+     */
+    private CompletableFuture<Integer> actualTableId(String tblName) {
+        HybridTimestamp now = clock.now();
 
-                    for (int tblId : tableIds) {
-                        tableFuts[i++] = tableAsyncInternal(tblId, false);
-                    }
+        return schemaSyncService.waitForMetadataCompleteness(now)
+                // TODO IGNITE-19499: Use id from Catalog here.
+                .thenApply(ignore -> {
+                    try {
+                        TableConfiguration exTblCfg = tablesCfg.tables().get(tblName);
 
-                    return allOf(tableFuts).thenApply(unused -> inBusyLock(busyLock, () -> {
-                        var tables = new ArrayList<Table>(tableIds.size());
-
-                        for (var fut : tableFuts) {
-                            var table = fut.join();
-
-                            if (table != null) {
-                                tables.add((Table) table);
-                            }
+                        if (exTblCfg == null) {
+                            return null;
+                        } else {
+                            return exTblCfg.id().value();
                         }
-
-                        return tables;
-                    }));
-                }));
-    }
-
-    /**
-     * Collects a list of direct table ids.
-     *
-     * @return A list of direct table ids.
-     */
-    private List<Integer> directTableIds() {
-        return configuredTablesCache.configuredTableIds();
-    }
-
-    /**
-     * Gets direct id of table with {@code tblName}.
-     *
-     * @param tblName Name of the table.
-     * @return Direct id of the table, or {@code null} if the table with the {@code tblName} has not been found.
-     */
-    @Nullable
-    private Integer directTableId(String tblName) {
-        try {
-            TableConfiguration exTblCfg = directProxy(tablesCfg.tables()).get(tblName);
-
-            if (exTblCfg == null) {
-                return null;
-            } else {
-                return exTblCfg.id().value();
-            }
-        } catch (NoSuchElementException e) {
-            return null;
-        }
+                    } catch (NoSuchElementException e) {
+                        return null;
+                    }
+                });
     }
 
     /**
@@ -2028,14 +2002,14 @@ public class TableManager extends Producer<TableEvent, TableEventParameters> imp
         }
 
         try {
-            return supplyAsync(() -> inBusyLock(busyLock, () -> directTableId(name)), ioExecutor)
-                    .thenCompose(tableId -> inBusyLock(busyLock, () -> {
+            return actualTableId(name)
+                    .thenComposeAsync(tableId -> inBusyLock(busyLock, () -> {
                         if (tableId == null) {
                             return completedFuture(null);
                         }
 
                         return tableAsyncInternal(tableId, false);
-                    }));
+                    }), ioExecutor);
         } finally {
             busyLock.leaveBusy();
         }
@@ -2050,6 +2024,22 @@ public class TableManager extends Producer<TableEvent, TableEventParameters> imp
      * @return Future representing pending completion of the operation.
      */
     public CompletableFuture<TableImpl> tableAsyncInternal(int id, boolean checkConfiguration) {
+        return schemaSyncService.waitForMetadataCompleteness(clock.now())
+                .thenApply(ignore -> {
+                    TableImpl table = tablesByIdVv.latest().get(id);
+
+                    if (table != null) {
+                        return table;
+                    } else if (!checkConfiguration) {
+                        return null;
+                    }
+
+                    throw new IllegalStateException("Table not found: id=" + id);
+                });
+    }
+
+    // TODO IGNITE-19499: Drop prev version of the method
+    private CompletableFuture<TableImpl> __tableAsyncInternal(int id, boolean checkConfiguration) {
         CompletableFuture<Boolean> tblCfgFut = checkConfiguration
                 ? supplyAsync(() -> inBusyLock(busyLock, () -> isTableConfigured(id)), ioExecutor)
                 : completedFuture(true);
