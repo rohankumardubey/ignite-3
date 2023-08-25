@@ -87,13 +87,16 @@ import org.apache.ignite.configuration.notifications.ConfigurationNotificationEv
 import org.apache.ignite.internal.affinity.AffinityUtils;
 import org.apache.ignite.internal.affinity.Assignment;
 import org.apache.ignite.internal.baseline.BaselineManager;
+import org.apache.ignite.internal.catalog.Catalog;
 import org.apache.ignite.internal.catalog.CatalogManager;
+import org.apache.ignite.internal.catalog.CatalogManagerImpl;
 import org.apache.ignite.internal.catalog.descriptors.CatalogDataStorageDescriptor;
 import org.apache.ignite.internal.catalog.descriptors.CatalogTableDescriptor;
 import org.apache.ignite.internal.catalog.descriptors.CatalogZoneDescriptor;
 import org.apache.ignite.internal.causality.CompletionListener;
 import org.apache.ignite.internal.causality.IncrementalVersionedValue;
 import org.apache.ignite.internal.cluster.management.ClusterManagementGroupManager;
+import org.apache.ignite.internal.cluster.management.ClusterTagImpl;
 import org.apache.ignite.internal.distributionzones.DistributionZoneManager;
 import org.apache.ignite.internal.distributionzones.DistributionZoneNotFoundException;
 import org.apache.ignite.internal.distributionzones.configuration.DistributionZonesConfiguration;
@@ -1822,11 +1825,20 @@ public class TableManager extends Producer<TableEvent, TableEventParameters> imp
         // TODO IGNITE-19499: Drop the rest of code and return Id from catalog instead.
         // return tableDescriptor == null ? null : tableDescriptor.id();
         if (tableDescriptor == null) {
+            Catalog catalog = ((CatalogManagerImpl) catalogManager).catalogAt(timestamp.longValue());
+
+            LOG.warn("XXX Table not found: tableName={}, "
+                            + " catalogVer={}, activationTime={}, safeTime={}, appliedRevision=",
+                    tableName,
+                    catalog.version(),
+                    catalog.time(),
+                    metaStorageMgr.clusterTime().currentSafeTime(),
+                    metaStorageMgr.appliedRevision()
+            );
             return null;
         }
 
         try {
-
             TableConfiguration exTblCfg = tablesCfg.tables().get(tableName);
 
             if (exTblCfg == null) {
@@ -2025,7 +2037,7 @@ public class TableManager extends Producer<TableEvent, TableEventParameters> imp
     }
 
     /**
-     * Internal method for getting table by id, without awaiting for actual metadata.
+     * Internal method for awaiting table initializaiton.
      *
      * @param id Table id.
      * @param checkConfiguration {@code True} when the method checks a configuration before trying to get a table, {@code false}

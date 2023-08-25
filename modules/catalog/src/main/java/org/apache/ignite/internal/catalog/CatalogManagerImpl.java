@@ -297,7 +297,7 @@ public class CatalogManagerImpl extends Producer<CatalogEvent, CatalogEventParam
         return catalogByVer.get(version);
     }
 
-    private Catalog catalogAt(long timestamp) {
+    public Catalog catalogAt(long timestamp) {
         Entry<Long, Catalog> entry = catalogByTs.floorEntry(timestamp);
 
         if (entry == null) {
