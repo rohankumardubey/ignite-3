@@ -270,15 +270,14 @@ public class TableManager extends Producer<TableEvent, TableEventParameters> imp
     private final IncrementalVersionedValue<Map<Integer, TableImpl>> tablesByIdVv;
 
     /**
-     * Versioned store for local partition set by table id.
-     * Completed strictly after {@link #tablesByIdVv} and strictly before {@link #assignmentsUpdatedVv}.
+     * Versioned store for local partition set by table id. Completed strictly after {@link #tablesByIdVv} and strictly before
+     * {@link #assignmentsUpdatedVv}.
      */
     private final IncrementalVersionedValue<Map<Integer, PartitionSet>> localPartsByTableIdVv;
 
     /**
-     * Versioned store for tracking RAFT groups initialization and starting completion.
-     * Only explicitly updated in {@link #createTablePartitionsLocally(long, List, int, TableImpl)}.
-     * Completed strictly after {@link #localPartsByTableIdVv}.
+     * Versioned store for tracking RAFT groups initialization and starting completion. Only explicitly updated in
+     * {@link #createTablePartitionsLocally(long, List, int, TableImpl)}. Completed strictly after {@link #localPartsByTableIdVv}.
      */
     private final IncrementalVersionedValue<Void> assignmentsUpdatedVv;
 
@@ -1817,10 +1816,15 @@ public class TableManager extends Producer<TableEvent, TableEventParameters> imp
      * @param tableName Table name
      * @return Table id or {@code null} if not found.
      */
-    private Integer resolveTableName(String tableName, HybridTimestamp timestamp) {
+    private @Nullable Integer resolveTableName(String tableName, HybridTimestamp timestamp) {
         CatalogTableDescriptor tableDescriptor = catalogManager.table(tableName, timestamp.longValue());
 
+        // TODO IGNITE-19499: Drop the rest of code and return Id from catalog instead.
         // return tableDescriptor == null ? null : tableDescriptor.id();
+        if (tableDescriptor == null) {
+            return null;
+        }
+
         try {
 
             TableConfiguration exTblCfg = tablesCfg.tables().get(tableName);
@@ -1836,8 +1840,8 @@ public class TableManager extends Producer<TableEvent, TableEventParameters> imp
     }
 
     /**
-     * Returns the tables by ID future for the given causality token.
-     * The future will only be completed when corresponding assignments update completes.
+     * Returns the tables by ID future for the given causality token. The future will only be completed when corresponding assignments
+     * update completes.
      *
      * @param causalityToken Causality token.
      * @return The future with tables map.
@@ -2005,8 +2009,9 @@ public class TableManager extends Producer<TableEvent, TableEventParameters> imp
             HybridTimestamp now = clock.now();
 
             return schemaSyncService.waitForMetadataCompleteness(now)
-                    .thenApply(ignore -> resolveTableName(tableName, now))
-                    .thenComposeAsync(tableId -> {
+                    .thenComposeAsync(ignore -> {
+                        Integer tableId = resolveTableName(tableName, now);
+
                         if (tableId == null) {
                             return completedFuture(null);
                         }
